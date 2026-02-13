@@ -6,6 +6,7 @@ load_dotenv()
 BASE_RPC_URL = os.getenv("BASE_RPC_URL", "https://mainnet.base.org")
 SOLANA_RPC_URL = os.getenv("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
 PORT = int(os.getenv("PORT", "8000"))
+PAY_TO_ADDRESS = os.getenv("PAY_TO_ADDRESS", "")
 
 VALID_CHAINS = {"base", "solana"}
 
