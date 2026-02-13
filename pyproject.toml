@@ -1,0 +1,9 @@
+[project]
+name = "position-receipt-api"
+version = "0.1.0"
+description = "Verify a wallet's current position in any token"
+requires-python = ">=3.9"
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
