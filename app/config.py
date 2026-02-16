@@ -5,6 +5,7 @@ load_dotenv()
 
 BASE_RPC_URL = os.getenv("BASE_RPC_URL", "https://mainnet.base.org")
 SOLANA_RPC_URL = os.getenv("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
+JUPITER_API_KEY = os.getenv("JUPITER_API_KEY", "")
 PORT = int(os.getenv("PORT", "8000"))
 PAY_TO_ADDRESS = {
     "base": os.getenv("PAY_TO_ADDRESS_BASE", ""),

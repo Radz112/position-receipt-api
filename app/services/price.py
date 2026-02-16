@@ -4,6 +4,7 @@ import asyncio
 import logging
 import time
 
+from app.config import JUPITER_API_KEY
 from app.services.rpc import get_client
 
 logger = logging.getLogger("apix")
@@ -60,8 +61,12 @@ async def _fetch_price(chain: str, token_address: str) -> float | None:
     client = get_client()
     try:
         if chain == "solana":
-            resp = await client.get(f"https://api.jup.ag/price/v2?ids={token_address}")
-            if resp.status_code == 429:
+            headers = {"x-api-key": JUPITER_API_KEY} if JUPITER_API_KEY else {}
+            resp = await client.get(
+                f"https://api.jup.ag/price/v2?ids={token_address}",
+                headers=headers,
+            )
+            if resp.status_code in (401, 429):
                 _trip_circuit(provider)
                 return None
             data = resp.json().get("data", {}).get(token_address)
