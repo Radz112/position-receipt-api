@@ -92,7 +92,8 @@ async def position_receipt(chain: str, request: Request):
         if err:
             return error_response(400, "invalid_depth", err, body)
 
-    is_native = token.lower() in NATIVE_TOKENS.get(chain, set())
+    _native_check = token.lower() if chain != "solana" else token
+    is_native = _native_check in NATIVE_TOKENS.get(chain, set()) or token.lower() in ("eth", "sol")
 
     # --- Concurrent fetch: balance + metadata + price ---
     try:

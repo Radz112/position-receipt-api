@@ -56,7 +56,7 @@ TRANSFER_BUDGET = {
 # Native token identifiers per chain (used to skip log-based scans)
 NATIVE_TOKENS = {
     "base": {"eth", "0x0000000000000000000000000000000000000000"},
-    "solana": {"sol", "so11111111111111111111111111111111111111112"},
+    "solana": {"sol", "So11111111111111111111111111111111111111112"},
 }
 
 # Pre-lowercased address sets — avoids rebuilding on every request

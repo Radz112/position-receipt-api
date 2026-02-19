@@ -44,26 +44,26 @@ _LOCAL_REGISTRY: dict[tuple[str, str], dict] = {
         "decimals": 18,
         "logo": None,
     },
-    # Solana
-    ("solana", "so11111111111111111111111111111111111111112"): {
+    # Solana (base58 addresses are CASE-SENSITIVE — do NOT lowercase)
+    ("solana", "So11111111111111111111111111111111111111112"): {
         "symbol": "SOL",
         "name": "Solana",
         "decimals": 9,
         "logo": None,
     },
-    ("solana", "epjfwdd5aufqssqem2qn1xzybapc8g4weggkzwytdt1v"): {
+    ("solana", "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v"): {
         "symbol": "USDC",
         "name": "USD Coin",
         "decimals": 6,
         "logo": None,
     },
-    ("solana", "dezzxtb7gnmweqrtzijhm3gc3bprbktajyjntrzg1v5"): {
+    ("solana", "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263"): {
         "symbol": "BONK",
         "name": "Bonk",
         "decimals": 5,
         "logo": None,
     },
-    ("solana", "jup6lkbzbjc6cdoftefzqzpn1ccg6xaggfcpeymqhvj"): {
+    ("solana", "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN"): {
         "symbol": "JUP",
         "name": "Jupiter",
         "decimals": 6,
@@ -143,7 +143,9 @@ async def resolve_token(chain: str, address: str) -> dict:
     Cache forever (token metadata doesn't change).
     Hard fails if metadata unreachable.
     """
-    key = (chain, address.lower())
+    # EVM addresses are case-insensitive; Solana base58 is case-sensitive
+    normalized = address.lower() if chain != "solana" else address
+    key = (chain, normalized)
 
     # 1. Check local registry
     if key in _LOCAL_REGISTRY:

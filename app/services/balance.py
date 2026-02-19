@@ -47,7 +47,7 @@ async def get_token_balance_base(address: str, token: str) -> dict:
 
 
 async def get_token_balance_solana(address: str, mint: str) -> dict:
-    if mint.lower() in NATIVE_TOKENS["solana"]:
+    if mint in NATIVE_TOKENS["solana"] or mint.lower() == "sol":
         balance = await rpc.solana_get_balance(address)
         lamports = balance["value"]
         return {"raw": lamports, "decimals": 9, "formatted": _format_balance(lamports, 9)}
