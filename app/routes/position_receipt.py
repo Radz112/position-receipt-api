@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from datetime import datetime, timezone
+from decimal import Decimal
 
 from fastapi import APIRouter, Request
 
@@ -136,8 +137,7 @@ async def position_receipt(chain: str, request: Request):
 
     # --- Compute values ---
     current_balance = balance_result["formatted"]
-    balance_float = float(current_balance) if current_balance != "0" else 0.0
-    current_value_usd = round(balance_float * price, 2) if price is not None else None
+    current_value_usd = round(float(Decimal(current_balance) * Decimal(str(price))), 2) if price is not None and current_balance != "0" else None
 
     flags = detect_flags(balance_result, current_value_usd, first_seen, recent_transfers, token_meta, chain)
 

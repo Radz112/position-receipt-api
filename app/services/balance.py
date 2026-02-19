@@ -1,10 +1,21 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from app.config import NATIVE_TOKENS
 from app.services import rpc
 
 BALANCE_OF_SELECTOR = "0x70a08231"
 DECIMALS_SELECTOR = "0x313ce567"
+
+
+def _format_balance(raw: int, decimals: int) -> str:
+    """Format a raw token balance without floating-point precision loss."""
+    if raw == 0:
+        return "0"
+    d = Decimal(raw) / Decimal(10 ** decimals)
+    # Normalize removes trailing zeros; format with fixed point to avoid scientific notation
+    return format(d.normalize(), "f")
 
 _decimals_cache: dict[str, int] = {}
 
@@ -26,20 +37,20 @@ async def _get_decimals_base(token: str) -> int:
 async def get_token_balance_base(address: str, token: str) -> dict:
     if token.lower() in NATIVE_TOKENS["base"]:
         balance_wei = await rpc.eth_get_balance(address)
-        return {"raw": balance_wei, "decimals": 18, "formatted": str(balance_wei / 10**18)}
+        return {"raw": balance_wei, "decimals": 18, "formatted": _format_balance(balance_wei, 18)}
 
     data = BALANCE_OF_SELECTOR + _encode_address(address)
     result = await rpc.eth_call(token, data)
     balance_raw = int(result, 16) if result and result != "0x" else 0
     decimals = await _get_decimals_base(token)
-    return {"raw": balance_raw, "decimals": decimals, "formatted": str(balance_raw / (10**decimals))}
+    return {"raw": balance_raw, "decimals": decimals, "formatted": _format_balance(balance_raw, decimals)}
 
 
 async def get_token_balance_solana(address: str, mint: str) -> dict:
     if mint.lower() in NATIVE_TOKENS["solana"]:
         balance = await rpc.solana_get_balance(address)
         lamports = balance["value"]
-        return {"raw": lamports, "decimals": 9, "formatted": str(lamports / 10**9)}
+        return {"raw": lamports, "decimals": 9, "formatted": _format_balance(lamports, 9)}
 
     accounts = await rpc.solana_get_token_accounts_by_owner(address, mint)
     if not accounts["value"]:
@@ -50,7 +61,7 @@ async def get_token_balance_solana(address: str, mint: str) -> dict:
         for acc in accounts["value"]
     )
     decimals = accounts["value"][0]["account"]["data"]["parsed"]["info"]["tokenAmount"]["decimals"]
-    return {"raw": total, "decimals": decimals, "formatted": str(total / (10**decimals))}
+    return {"raw": total, "decimals": decimals, "formatted": _format_balance(total, decimals)}
 
 
 async def get_token_balance(chain: str, address: str, token: str) -> dict:
