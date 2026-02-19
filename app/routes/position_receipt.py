@@ -9,7 +9,7 @@ from app.utils.params import extract_param
 from app.utils.errors import error_response
 from app.utils.validation import validate_chain, validate_address, validate_token, validate_depth
 from app.services.balance import get_token_balance
-from app.services.token_metadata import resolve_token
+from app.services.token_metadata import resolve_token, resolve_symbol_to_address
 from app.services.price import get_token_price_cached
 from app.services.first_seen import estimate_first_seen
 from app.services.transfers import get_recent_transfers, derive_last_transfers
@@ -63,6 +63,14 @@ async def position_receipt(chain: str, request: Request):
     address = extract_param(body, "address", aliases=["wallet", "addr"], use_query_fallback=True)
     token = extract_param(body, "token", aliases=["mint", "contract", "token_address"])
     depth = extract_param(body, "depth") or "standard"
+
+    # If token looks like a ticker symbol (not an address), try to resolve it
+    if token and isinstance(token, str) and validate_token(chain, token) is not None and token.lower() not in ("eth", "sol"):
+        resolved = await resolve_symbol_to_address(chain, token)
+        if resolved:
+            token = resolved
+        else:
+            return error_response(400, "unknown_symbol", f"Could not resolve token symbol '{token}' to an address on {chain}", body)
 
     for check, code, msg in [
         (validate_chain(chain), "invalid_chain", None),

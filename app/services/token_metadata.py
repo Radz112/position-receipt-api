@@ -71,6 +71,46 @@ _LOCAL_REGISTRY: dict[tuple[str, str], dict] = {
     },
 }
 
+# Reverse lookup: (chain, SYMBOL) -> address — built from _LOCAL_REGISTRY
+_SYMBOL_TO_ADDRESS: dict[tuple[str, str], str] = {}
+for (_chain, _addr), _meta in _LOCAL_REGISTRY.items():
+    _SYMBOL_TO_ADDRESS[(_chain, _meta["symbol"].upper())] = _addr
+
+
+async def resolve_symbol_to_address(chain: str, symbol: str) -> str | None:
+    """Resolve a ticker symbol to a contract address.
+    Checks local registry first, then DexScreener search.
+    Returns the address or None if unresolvable.
+    """
+    key = (chain, symbol.upper())
+    if key in _SYMBOL_TO_ADDRESS:
+        return _SYMBOL_TO_ADDRESS[key]
+
+    # Fallback: search DexScreener
+    try:
+        client = get_client()
+        resp = await client.get(
+            f"https://api.dexscreener.com/latest/dex/search?q={symbol}",
+            timeout=3.0,
+        )
+        if resp.status_code == 200:
+            pairs = resp.json().get("pairs") or []
+            chain_id = "base" if chain == "base" else "solana"
+            for pair in pairs:
+                if pair.get("chainId") != chain_id:
+                    continue
+                base = pair.get("baseToken", {})
+                if base.get("symbol", "").upper() == symbol.upper() and base.get("address"):
+                    addr = base["address"]
+                    # Cache for future lookups
+                    _SYMBOL_TO_ADDRESS[key] = addr
+                    return addr
+    except Exception as e:
+        logger.debug("DexScreener symbol search failed for %s: %s", symbol, e)
+
+    return None
+
+
 # ERC20 function selectors
 NAME_SELECTOR = "0x06fdde03"
 SYMBOL_SELECTOR = "0x95d89b41"
