@@ -78,14 +78,20 @@ DECIMALS_SELECTOR = "0x313ce567"
 
 
 def _decode_string(hex_data: str) -> str:
-    """Decode ABI-encoded string from eth_call result."""
-    if not hex_data or hex_data == "0x" or len(hex_data) < 130:
+    """Decode ABI-encoded string from eth_call result.
+    Handles both standard ABI-encoded strings and bytes32 returns.
+    """
+    if not hex_data or hex_data == "0x":
         return ""
     try:
         data = bytes.fromhex(hex_data[2:])
-        offset = int.from_bytes(data[:32], "big")
-        length = int.from_bytes(data[offset : offset + 32], "big")
-        return data[offset + 32 : offset + 32 + length].decode("utf-8", errors="replace").strip("\x00")
+        if len(hex_data) >= 130:
+            # Standard ABI-encoded string: offset + length + data
+            offset = int.from_bytes(data[:32], "big")
+            length = int.from_bytes(data[offset : offset + 32], "big")
+            return data[offset + 32 : offset + 32 + length].decode("utf-8", errors="replace").strip("\x00")
+        # bytes32 return (e.g. MKR-style tokens): right-padded with zeroes
+        return data.rstrip(b"\x00").decode("utf-8", errors="replace").strip()
     except Exception:
         return ""
 
@@ -121,7 +127,9 @@ async def resolve_token(chain: str, address: str) -> dict:
 
 
 async def _resolve_evm(address: str) -> dict:
-    """Fetch ERC20 metadata on-chain: name(), symbol(), decimals()."""
+    """Fetch ERC20 metadata on-chain: name(), symbol(), decimals().
+    Falls back to DexScreener if on-chain calls return no symbol.
+    """
     name_hex = await rpc.eth_call(address, NAME_SELECTOR)
     symbol_hex = await rpc.eth_call(address, SYMBOL_SELECTOR)
     decimals_hex = await rpc.eth_call(address, DECIMALS_SELECTOR)
@@ -131,6 +139,11 @@ async def _resolve_evm(address: str) -> dict:
     decimals = int(decimals_hex, 16) if decimals_hex and decimals_hex != "0x" else 18
 
     if not symbol:
+        # Fallback: try DexScreener for metadata
+        dex_meta = await _fetch_dexscreener_metadata(address)
+        if dex_meta:
+            dex_meta.setdefault("decimals", decimals)
+            return dex_meta
         raise Exception(f"Could not resolve token metadata for {address} — no symbol returned")
 
     return {
@@ -139,6 +152,39 @@ async def _resolve_evm(address: str) -> dict:
         "decimals": decimals,
         "logo": None,
     }
+
+
+async def _fetch_dexscreener_metadata(address: str) -> dict | None:
+    """Fetch token metadata from DexScreener as a fallback."""
+    try:
+        client = get_client()
+        resp = await client.get(
+            f"https://api.dexscreener.com/latest/dex/tokens/{address}",
+            timeout=3.0,
+        )
+    except Exception as e:
+        logger.debug("DexScreener metadata fallback failed for %s: %s", address, e)
+        return None
+
+    if resp.status_code != 200:
+        return None
+
+    pairs = resp.json().get("pairs")
+    if not pairs:
+        return None
+
+    # Use baseToken info from the first pair where this address is the base token
+    for pair in pairs:
+        base = pair.get("baseToken", {})
+        if base.get("address", "").lower() == address.lower() and base.get("symbol"):
+            return {
+                "symbol": base["symbol"],
+                "name": base.get("name", base["symbol"]),
+                "decimals": None,  # DexScreener doesn't provide decimals
+                "logo": None,
+            }
+
+    return None
 
 
 async def _resolve_solana(mint: str) -> dict:
