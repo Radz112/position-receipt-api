@@ -60,10 +60,16 @@ async def position_receipt(chain: str, request: Request):
     if not isinstance(body, dict):
         return error_response(400, "invalid_body", "Request body must be a JSON object", {"raw": str(body)[:200]})
 
-    # --- Extract & validate ---
+    # --- Extract & sanitize ---
     address = extract_param(body, "address", aliases=["wallet", "addr"], use_query_fallback=True)
     token = extract_param(body, "token", aliases=["mint", "contract", "token_address"])
     depth = extract_param(body, "depth") or "standard"
+
+    # Strip junk characters APIX agent may prepend/append
+    if address and isinstance(address, str):
+        address = address.strip().strip("-").strip()
+    if token and isinstance(token, str):
+        token = token.strip().strip("-").strip()
 
     # If token looks like a ticker symbol (not an address), try to resolve it
     if token and isinstance(token, str) and validate_token(chain, token) is not None and token.lower() not in ("eth", "sol"):
