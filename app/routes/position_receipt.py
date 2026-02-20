@@ -71,7 +71,12 @@ async def position_receipt(chain: str, request: Request):
         if resolved:
             token = resolved
         else:
-            return error_response(400, "unknown_symbol", f"Could not resolve token symbol '{token}' to an address on {chain}", body)
+            return error_response(
+                400, "unknown_symbol",
+                f"Could not resolve token symbol '{token}' to an address on {chain}",
+                body,
+                hint="Send a well-known token symbol (e.g. BONK, WIF, DEGEN, USDC) or the exact contract/mint address. Do NOT fabricate addresses.",
+            )
 
     for check, code, msg in [
         (validate_chain(chain), "invalid_chain", None),
@@ -106,7 +111,12 @@ async def position_receipt(chain: str, request: Request):
         logger.error("Fetch error: %s", e, exc_info=True)
         err_msg = str(e).lower()
         if "not found" in err_msg or "could not find" in err_msg or "invalid param" in err_msg:
-            return error_response(404, "token_not_found", f"Token not found on {chain}: {token}", body)
+            return error_response(
+                404, "token_not_found",
+                f"Token not found on {chain}: {token}",
+                body,
+                hint="The token address does not exist on-chain. If you meant a token by its symbol (e.g. BONK, WIF, DEGEN), send ONLY the symbol as the token parameter. Do NOT generate or guess contract/mint addresses.",
+            )
         return error_response(502, "upstream_error", f"Failed to fetch data: {e}", body)
 
     # --- First-seen estimation ---
