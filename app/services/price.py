@@ -22,6 +22,10 @@ _PROVIDERS = {
     "base": "dexscreener",
 }
 
+_FALLBACK_PROVIDERS = {
+    "solana": "dexscreener",
+}
+
 
 def _circuit_open(provider: str) -> bool:
     cb = _circuit[provider]
@@ -43,14 +47,40 @@ async def get_token_price_cached(chain: str, token_address: str) -> float | None
         return cached["price"]
 
     try:
-        price = await asyncio.wait_for(_fetch_price(chain, token_address), timeout=0.3)
+        price = await asyncio.wait_for(_fetch_price(chain, token_address), timeout=3.0)
     except Exception as e:
         logger.debug("Price fetch failed for %s:%s — %s", chain, token_address, e)
-        return None
+        price = None
+
+    # Fallback provider if primary failed
+    if price is None and chain in _FALLBACK_PROVIDERS:
+        try:
+            price = await asyncio.wait_for(
+                _fetch_price_dexscreener(token_address), timeout=3.0
+            )
+        except Exception as e:
+            logger.debug("Price fallback failed for %s:%s — %s", chain, token_address, e)
 
     if price is not None:
         _price_cache[key] = {"price": price, "expires": now + 30}
     return price
+
+
+async def _fetch_price_dexscreener(token_address: str) -> float | None:
+    """Fetch price from DexScreener (works for any chain)."""
+    if _circuit_open("dexscreener"):
+        return None
+    client = get_client()
+    try:
+        resp = await client.get(f"https://api.dexscreener.com/latest/dex/tokens/{token_address}")
+        if resp.status_code == 429:
+            _trip_circuit("dexscreener")
+            return None
+        pairs = resp.json().get("pairs")
+        return float(pairs[0].get("priceUsd", 0)) if pairs else None
+    except Exception as e:
+        logger.warning("DexScreener price error for %s — %s", token_address, e)
+        return None
 
 
 async def _fetch_price(chain: str, token_address: str) -> float | None:
