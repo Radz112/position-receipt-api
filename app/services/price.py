@@ -77,6 +77,38 @@ async def get_token_price_cached(chain: str, token_address: str) -> float | None
     return price
 
 
+_STABLECOIN_SYMBOLS = {"USDC", "USDT", "DAI", "BUSD", "USDbC", "USDC.e"}
+
+
+def _extract_price_from_pairs(pairs: list, token_address: str) -> float | None:
+    """Find the best price from DexScreener pairs for a given token.
+    Prefers pairs where our token is base and quote is a stablecoin.
+    """
+    if not pairs:
+        return None
+
+    addr_lower = token_address.lower()
+    best = None
+
+    for pair in pairs:
+        base = pair.get("baseToken", {})
+        quote = pair.get("quoteToken", {})
+        price_usd = pair.get("priceUsd")
+        if not price_usd:
+            continue
+
+        # Our token is the base token — priceUsd is directly its price
+        if base.get("address", "").lower() == addr_lower:
+            price = float(price_usd)
+            # Prefer stablecoin-quoted pairs (most accurate)
+            if quote.get("symbol", "").upper() in _STABLECOIN_SYMBOLS:
+                return price
+            if best is None:
+                best = price
+
+    return best
+
+
 async def _fetch_price_dexscreener(token_address: str) -> float | None:
     """Fetch price from DexScreener (works for any chain)."""
     if _circuit_open("dexscreener"):
@@ -88,7 +120,7 @@ async def _fetch_price_dexscreener(token_address: str) -> float | None:
             _trip_circuit("dexscreener")
             return None
         pairs = resp.json().get("pairs")
-        return float(pairs[0].get("priceUsd", 0)) if pairs else None
+        return _extract_price_from_pairs(pairs, token_address)
     except Exception as e:
         logger.warning("DexScreener price error for %s — %s", token_address, e)
         return None
@@ -119,7 +151,7 @@ async def _fetch_price(chain: str, token_address: str) -> float | None:
                 _trip_circuit(provider)
                 return None
             pairs = resp.json().get("pairs")
-            return float(pairs[0].get("priceUsd", 0)) if pairs else None
+            return _extract_price_from_pairs(pairs, token_address)
     except Exception as e:
         logger.warning("Price API error for %s:%s — %s", chain, token_address, e)
         return None
