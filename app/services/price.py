@@ -39,7 +39,18 @@ def _trip_circuit(provider: str):
     _circuit[provider] = {"open": True, "until": time.time() + CIRCUIT_OPEN_DURATION}
 
 
+_NATIVE_PRICE_MAP = {
+    ("base", "eth"): "0x4200000000000000000000000000000000000006",      # WETH on Base
+    ("solana", "sol"): "So11111111111111111111111111111111111111112",     # Wrapped SOL
+}
+
+
 async def get_token_price_cached(chain: str, token_address: str) -> float | None:
+    # Map native token symbols to addresses that price APIs recognize
+    canonical = _NATIVE_PRICE_MAP.get((chain, token_address.lower()))
+    if canonical:
+        token_address = canonical
+
     key = f"{chain}:{token_address.lower()}"
     now = time.time()
     cached = _price_cache.get(key)

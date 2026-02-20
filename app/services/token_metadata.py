@@ -136,6 +136,12 @@ def _decode_string(hex_data: str) -> str:
         return ""
 
 
+_NATIVE_SYMBOL_MAP = {
+    ("base", "eth"): "0x0000000000000000000000000000000000000000",
+    ("solana", "sol"): "So11111111111111111111111111111111111111112",
+}
+
+
 async def resolve_token(chain: str, address: str) -> dict:
     """
     Resolve token metadata.
@@ -143,6 +149,11 @@ async def resolve_token(chain: str, address: str) -> dict:
     Cache forever (token metadata doesn't change).
     Hard fails if metadata unreachable.
     """
+    # Map native token symbols to canonical addresses
+    native_addr = _NATIVE_SYMBOL_MAP.get((chain, address.lower()))
+    if native_addr:
+        address = native_addr
+
     # EVM addresses are case-insensitive; Solana base58 is case-sensitive
     normalized = address.lower() if chain != "solana" else address
     key = (chain, normalized)
