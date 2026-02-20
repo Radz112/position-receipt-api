@@ -105,7 +105,7 @@ async def position_receipt(chain: str, request: Request):
     except Exception as e:
         logger.error("Fetch error: %s", e, exc_info=True)
         err_msg = str(e).lower()
-        if "not found" in err_msg or "account not found" in err_msg:
+        if "not found" in err_msg or "could not find" in err_msg or "invalid param" in err_msg:
             return error_response(404, "token_not_found", f"Token not found on {chain}: {token}", body)
         return error_response(502, "upstream_error", f"Failed to fetch data: {e}", body)
 
