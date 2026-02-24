@@ -4,12 +4,12 @@ import asyncio
 import httpx
 import logging
 
-from app.config import BASE_RPC_URL, SOLANA_RPC_URL
+from app.config import BASE_RPC_URL, BASE_RPC_FALLBACKS, SOLANA_RPC_URL
 
 logger = logging.getLogger("apix")
 
 _MAX_RETRIES = 3
-_RETRY_BACKOFF = 0.25  # seconds; doubles each retry (0.25, 0.5, 1.0)
+_RETRY_BACKOFF = 0.15  # seconds; doubles each retry (0.15, 0.3, 0.6)
 _RETRYABLE_STATUS = {429, 502, 503}
 
 _client: httpx.AsyncClient | None = None
@@ -31,17 +31,27 @@ async def close_client():
 
 # --- Shared RPC helpers ---
 
-async def _rpc_with_retry(url: str, payload: dict, label: str):
-    """Execute a JSON-RPC call with retry on transient failures."""
+async def _rpc_with_retry(
+    url: str,
+    payload: dict,
+    label: str,
+    fallback_urls: list[str] | None = None,
+):
+    """Execute a JSON-RPC call with retry + fallback RPC rotation."""
+    urls = [url] + (fallback_urls or [])
     last_exc: Exception | None = None
+
     for attempt in range(_MAX_RETRIES + 1):
+        target = urls[attempt % len(urls)]
         try:
-            resp = await get_client().post(url, json=payload)
+            resp = await get_client().post(target, json=payload)
             if resp.status_code in _RETRYABLE_STATUS and attempt < _MAX_RETRIES:
                 wait = _RETRY_BACKOFF * (2 ** attempt)
+                next_url = urls[(attempt + 1) % len(urls)]
                 logger.info(
-                    "%s returned %d, retrying in %.2fs (attempt %d/%d)",
-                    label, resp.status_code, wait, attempt + 1, _MAX_RETRIES,
+                    "%s %s returned %d, retrying via %s in %.2fs (attempt %d/%d)",
+                    label, target, resp.status_code, next_url, wait,
+                    attempt + 1, _MAX_RETRIES,
                 )
                 await asyncio.sleep(wait)
                 continue
@@ -52,13 +62,15 @@ async def _rpc_with_retry(url: str, payload: dict, label: str):
             return data["result"]
         except httpx.HTTPStatusError:
             raise
-        except httpx.TimeoutException as e:
+        except (httpx.TimeoutException, httpx.ConnectError) as e:
             last_exc = e
             if attempt < _MAX_RETRIES:
                 wait = _RETRY_BACKOFF * (2 ** attempt)
+                next_url = urls[(attempt + 1) % len(urls)]
                 logger.info(
-                    "%s timed out, retrying in %.2fs (attempt %d/%d)",
-                    label, wait, attempt + 1, _MAX_RETRIES,
+                    "%s %s failed (%s), retrying via %s in %.2fs (attempt %d/%d)",
+                    label, target, type(e).__name__, next_url, wait,
+                    attempt + 1, _MAX_RETRIES,
                 )
                 await asyncio.sleep(wait)
                 continue
@@ -67,11 +79,12 @@ async def _rpc_with_retry(url: str, payload: dict, label: str):
 
 
 async def _eth_rpc(method: str, params: list):
-    """Execute a Base JSON-RPC call and return the result field."""
+    """Execute a Base JSON-RPC call with fallback RPC rotation."""
     return await _rpc_with_retry(
         BASE_RPC_URL,
         {"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
         "RPC",
+        fallback_urls=BASE_RPC_FALLBACKS,
     )
 
 

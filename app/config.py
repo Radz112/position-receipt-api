@@ -4,6 +4,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 BASE_RPC_URL = os.getenv("BASE_RPC_URL", "https://mainnet.base.org")
+BASE_RPC_FALLBACKS: list[str] = [
+    url.strip()
+    for url in os.getenv("BASE_RPC_FALLBACKS", "https://base.llamarpc.com,https://base.drpc.org").split(",")
+    if url.strip()
+]
 SOLANA_RPC_URL = os.getenv("SOLANA_RPC_URL", "https://api.mainnet-beta.solana.com")
 JUPITER_API_KEY = os.getenv("JUPITER_API_KEY", "")
 PORT = int(os.getenv("PORT", "8000"))
