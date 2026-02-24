@@ -155,10 +155,10 @@ async def test_base_transfers_rpc_cap(mock_rpc):
 
     result = await get_recent_transfers_base("0x" + "1" * 40, "0x" + "2" * 40, 18)
 
-    # Should have stopped at max_rpc_calls (10)
+    # Should have stopped at max_rpc_calls (20)
     # 1 call for block number + up to 2 per chunk (inbound + outbound)
     total_calls = mock_rpc.eth_block_number.call_count + mock_rpc.eth_get_logs.call_count
-    assert total_calls <= 10
+    assert total_calls <= 20
     assert result["truncated"] is True
 
 

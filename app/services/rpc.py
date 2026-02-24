@@ -108,8 +108,13 @@ async def eth_get_balance(address: str, block: str = "latest") -> int:
     return int(result, 16)
 
 
-_RANGE_TOO_LARGE_CODES = {-32603, -32005}
-_MIN_CHUNK = 500
+_FALLBACK_CHUNK_SIZE = 1000  # safe for all known free RPCs
+_MIN_CHUNK = 200
+
+
+def _is_range_error(exc: Exception) -> bool:
+    s = str(exc).lower()
+    return "range" in s and ("large" in s or "exceed" in s or "limit" in s)
 
 
 async def eth_get_logs(params: dict) -> list:
@@ -117,19 +122,17 @@ async def eth_get_logs(params: dict) -> list:
     try:
         return await _eth_rpc("eth_getLogs", [params])
     except Exception as e:
-        err_str = str(e)
-        if "range" not in err_str.lower() or "large" not in err_str.lower():
+        if not _is_range_error(e):
             raise
 
-    # Fallback RPC has a smaller block range limit — split and retry
     from_block = int(params["fromBlock"], 16)
     to_block = int(params["toBlock"], 16)
     span = to_block - from_block
     if span <= _MIN_CHUNK:
-        raise
+        raise  # already small, nothing to split
 
-    sub_size = max(_MIN_CHUNK, span // 4)
-    logger.info("eth_getLogs range too large (%d blocks), splitting into %d-block sub-chunks", span, sub_size)
+    sub_size = _FALLBACK_CHUNK_SIZE
+    logger.info("eth_getLogs range too large (%d blocks), re-fetching in %d-block sub-chunks", span, sub_size)
     all_logs: list = []
     cursor = from_block
     while cursor <= to_block:

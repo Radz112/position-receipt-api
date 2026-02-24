@@ -23,28 +23,28 @@ DEPTH_CONFIG = {
     "fast": {
         "base_days": 30,
         "sol_sigs": 200,
-        "max_rpc_calls": 8,
-        "max_time_s": 1.0,
+        "max_rpc_calls": 15,
+        "max_time_s": 2.0,
     },
     "standard": {
         "base_days": 90,
         "sol_sigs": 500,
-        "max_rpc_calls": 12,
-        "max_time_s": 2.0,
+        "max_rpc_calls": 25,
+        "max_time_s": 4.0,
     },
     "deep": {
         "base_days": 180,
         "sol_sigs": 1000,
-        "max_rpc_calls": 16,
-        "max_time_s": 3.0,
+        "max_rpc_calls": 40,
+        "max_time_s": 6.0,
     },
 }
 
 TRANSFER_BUDGET = {
     "base": {
-        "max_rpc_calls": 10,
-        "max_time_s": 1.0,
-        "chunk_size": 25_000,
+        "max_rpc_calls": 20,
+        "max_time_s": 3.0,
+        "chunk_size": 10_000,
         "target_inbound": 5,
         "target_outbound": 5,
     },

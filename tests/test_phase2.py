@@ -135,17 +135,17 @@ async def test_base_rpc_cap_enforcement(mock_rpc):
     result = await estimate_first_seen_base(
         "0x1234567890abcdef1234567890abcdef12345678",
         "0x4ed4E862860beD51a9570b96d89aF5E1B0Efefed",
-        "fast",  # max_rpc_calls = 8
+        "fast",  # max_rpc_calls = 15
     )
 
     # eth_block_number (1) + eth_get_block_by_number (1) + eth_getLogs calls
-    # Total should not exceed 8
+    # Total should not exceed 15
     total_calls = (
         mock_rpc.eth_block_number.call_count
         + mock_rpc.eth_get_block_by_number.call_count
         + mock_rpc.eth_get_logs.call_count
     )
-    assert total_calls <= 8
+    assert total_calls <= 15
     assert result["confidence"] == "low"
 
 

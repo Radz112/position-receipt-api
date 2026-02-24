@@ -10,7 +10,7 @@ from app.utils.evm import TRANSFER_TOPIC, pad_address
 
 logger = logging.getLogger("apix")
 
-CHUNK_SIZE = 50_000
+CHUNK_SIZE = 10_000
 BASE_AVG_BLOCK_TIME = 2.0
 
 
