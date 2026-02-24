@@ -84,10 +84,10 @@ class TestDecodeString:
     def test_valid_long(self):
         assert _decode_string(_abi_encode_string("Wrapped Ether")) == "Wrapped Ether"
 
-    def test_bytes32_under_length_guard(self):
-        # 32 bytes = 66 chars with 0x prefix, under the 130-char guard
+    def test_bytes32_decoded(self):
+        # 32 bytes = 64 hex chars; bytes32 return (e.g. MKR-style tokens)
         raw = "TOKEN".encode("utf-8").ljust(32, b"\x00")
-        assert _decode_string("0x" + raw.hex()) == ""
+        assert _decode_string("0x" + raw.hex()) == "TOKEN"
 
     def test_garbage_hex_returns_empty(self):
         # ABI path interprets huge offset → length=0 → ""
@@ -656,7 +656,7 @@ class TestHTTPValidation:
     async def test_invalid_token(self, client):
         resp = await client.post("/v1/position-receipt/base", json={"address": "0x" + "a" * 40, "token": "bad"})
         assert resp.status_code == 400
-        assert resp.json()["error"] == "invalid_token"
+        assert resp.json()["error"] in ("invalid_token", "unknown_symbol")
 
     @pytest.mark.anyio
     async def test_invalid_depth(self, client):

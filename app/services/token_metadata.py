@@ -124,8 +124,11 @@ def _decode_string(hex_data: str) -> str:
     if not hex_data or hex_data == "0x":
         return ""
     try:
-        data = bytes.fromhex(hex_data[2:])
-        if len(hex_data) >= 130:
+        raw = hex_data[2:]
+        if len(raw) < 64:
+            return ""
+        data = bytes.fromhex(raw)
+        if len(raw) >= 128:
             # Standard ABI-encoded string: offset + length + data
             offset = int.from_bytes(data[:32], "big")
             length = int.from_bytes(data[offset : offset + 32], "big")

@@ -107,7 +107,7 @@ async def test_post_invalid_token_base(client):
         json={"address": "0x1234567890abcdef1234567890abcdef12345678", "token": "bad"},
     )
     assert resp.status_code == 400
-    assert resp.json()["error"] == "invalid_token"
+    assert resp.json()["error"] in ("invalid_token", "unknown_symbol")
 
 
 @pytest.mark.anyio

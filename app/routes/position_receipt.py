@@ -154,7 +154,12 @@ async def position_receipt(chain: str, request: Request):
 
     # --- Compute values ---
     current_balance = balance_result["formatted"]
-    current_value_usd = round(float(Decimal(current_balance) * Decimal(str(price))), 2) if price is not None and current_balance != "0" else None
+    if price is None:
+        current_value_usd = None
+    elif current_balance == "0":
+        current_value_usd = 0.0
+    else:
+        current_value_usd = round(float(Decimal(current_balance) * Decimal(str(price))), 2)
 
     flags = detect_flags(balance_result, current_value_usd, first_seen, recent_transfers, token_meta, chain)
 

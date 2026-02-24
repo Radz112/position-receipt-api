@@ -1,11 +1,16 @@
 from __future__ import annotations
 
+import asyncio
 import httpx
 import logging
 
 from app.config import BASE_RPC_URL, SOLANA_RPC_URL
 
 logger = logging.getLogger("apix")
+
+_MAX_RETRIES = 3
+_RETRY_BACKOFF = 0.25  # seconds; doubles each retry (0.25, 0.5, 1.0)
+_RETRYABLE_STATUS = {429, 502, 503}
 
 _client: httpx.AsyncClient | None = None
 
@@ -26,30 +31,57 @@ async def close_client():
 
 # --- Shared RPC helpers ---
 
+async def _rpc_with_retry(url: str, payload: dict, label: str):
+    """Execute a JSON-RPC call with retry on transient failures."""
+    last_exc: Exception | None = None
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            resp = await get_client().post(url, json=payload)
+            if resp.status_code in _RETRYABLE_STATUS and attempt < _MAX_RETRIES:
+                wait = _RETRY_BACKOFF * (2 ** attempt)
+                logger.info(
+                    "%s returned %d, retrying in %.2fs (attempt %d/%d)",
+                    label, resp.status_code, wait, attempt + 1, _MAX_RETRIES,
+                )
+                await asyncio.sleep(wait)
+                continue
+            resp.raise_for_status()
+            data = resp.json()
+            if "error" in data:
+                raise Exception(f"{label} error: {data['error']}")
+            return data["result"]
+        except httpx.HTTPStatusError:
+            raise
+        except httpx.TimeoutException as e:
+            last_exc = e
+            if attempt < _MAX_RETRIES:
+                wait = _RETRY_BACKOFF * (2 ** attempt)
+                logger.info(
+                    "%s timed out, retrying in %.2fs (attempt %d/%d)",
+                    label, wait, attempt + 1, _MAX_RETRIES,
+                )
+                await asyncio.sleep(wait)
+                continue
+            raise
+    raise last_exc  # type: ignore[misc]
+
+
 async def _eth_rpc(method: str, params: list):
     """Execute a Base JSON-RPC call and return the result field."""
-    resp = await get_client().post(
+    return await _rpc_with_retry(
         BASE_RPC_URL,
-        json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
+        {"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
+        "RPC",
     )
-    resp.raise_for_status()
-    data = resp.json()
-    if "error" in data:
-        raise Exception(f"RPC error: {data['error']}")
-    return data["result"]
 
 
 async def solana_rpc(method: str, params: list):
     """Execute a Solana JSON-RPC call and return the result field."""
-    resp = await get_client().post(
+    return await _rpc_with_retry(
         SOLANA_RPC_URL,
-        json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
+        {"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
+        "Solana RPC",
     )
-    resp.raise_for_status()
-    data = resp.json()
-    if "error" in data:
-        raise Exception(f"Solana RPC error: {data['error']}")
-    return data["result"]
 
 
 # --- Base (EVM) ---
